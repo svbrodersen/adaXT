@@ -1,3 +1,4 @@
+# distutils: define_macros=NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 import numpy as np
 from setuptools import setup, Extension, find_packages
 
@@ -36,6 +37,7 @@ extensions = [
         include_dirs=[include_dir],
         language="c++",
         extra_compile_args=["-O3"],
+        define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     )
 ]
 
@@ -47,6 +49,7 @@ extensions += [
         include_dirs=[include_dir],
         language="c++",
         extra_compile_args=["-O3"],
+        define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     )
 ]
 
