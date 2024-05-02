@@ -90,4 +90,5 @@ if __name__ == "__main__":
             running_times.append(running_time(n, m, random_state, i, n_estimators))
         mean_running_times.append(np.mean(running_times, axis=0))
     plt.plot(n_jobs, mean_running_times)
+    plt.legend()
     plt.show()
