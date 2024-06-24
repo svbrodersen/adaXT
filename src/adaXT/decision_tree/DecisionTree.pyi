@@ -4,7 +4,6 @@ from ..criteria import Criteria
 import sys
 from typing import Type
 
-
 class DecisionTree:
     """
     Attributes
@@ -24,10 +23,23 @@ class DecisionTree:
     n_classes: int
         the number of classes of the training data, 0 for Regression Tree
     n_obs: int
-        the number of observations used for training
+        The number of observations in the training data.
+    n_rows: int
+        The length of the training data.
     classes: np.ndarray
         the different classes in the tree given a Classification tree
     """
+
+    max_depth: int
+    tree_type: str
+    leaf_nodes: list[LeafNode]
+    root: Node
+    n_nodes: int
+    n_features: int
+    n_classes: int
+    n_obs: int
+    n_rows: int
+    classes: np.ndarray
 
     def __init__(
         self,
@@ -66,11 +78,12 @@ class DecisionTree:
         pass
 
     def fit(
-            self,
-            X,
-            Y,
-            sample_indices: np.ndarray | None = None,
-            sample_weight: np.ndarray | None = None,) -> None:
+        self,
+        X,
+        Y,
+        sample_indices: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> None:
         """
         Function used to fit the data on the tree using the DepthTreeBuilder
 
