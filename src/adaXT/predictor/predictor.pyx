@@ -71,10 +71,10 @@ def predict_quantile(
 
 
 cdef class Predictor():
-    def __init__(self, const double[:, ::1] X, const double[:, ::1] Y, object root, **kwargs):
+    def __init__(self, const double[:, ::1] X, const double[:, ::1] Y, cnp.ndarray nodes, **kwargs):
         self.X = np.asarray(X)
         self.Y = np.asarray(Y)
-        self.root = root
+        self.nodes = nodes
         self.n_features = X.shape[1]
 
     def predict(self, double[:, ::1] X, **kwargs) -> np.ndarray:

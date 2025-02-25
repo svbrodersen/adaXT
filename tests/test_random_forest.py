@@ -19,26 +19,16 @@ import sys
 
 
 def get_regression_data(
-        n,
-        m,
-        random_state: np.random.RandomState,
-        lowx=0,
-        highx=100,
-        lowy=0,
-        highy=5):
+    n, m, random_state: np.random.RandomState, lowx=0, highx=100, lowy=0, highy=5
+):
     X = random_state.uniform(lowx, highx, (n, m))
     Y = random_state.uniform(lowy, highy, n)
     return (X, Y)
 
 
 def get_classification_data(
-        n,
-        m,
-        random_state: np.random.RandomState,
-        lowx=0,
-        highx=100,
-        lowy=0,
-        highy=5):
+    n, m, random_state: np.random.RandomState, lowx=0, highx=100, lowy=0, highy=5
+):
     X = random_state.uniform(lowx, highx, (n, m))
     Y = random_state.randint(lowy, highy, n)
     return (X, Y)
@@ -146,9 +136,9 @@ def test_dominant_feature():
 
     # Assert
     for i, el in enumerate(pred):
-        assert (
-            el == prediction_data[i, -1]
-        ), f"The data for prediction should be equal to the data in the last row of prediction_data, as it is a dominant feature but was {el} and {prediction_data[i, -1]}"
+        assert el == prediction_data[i, -1], (
+            f"The data for prediction should be equal to the data in the last row of prediction_data, as it is a dominant feature but was {el} and {prediction_data[i, -1]}"
+        )
 
 
 def test_deterministic_seeding_regression():
@@ -157,8 +147,7 @@ def test_deterministic_seeding_regression():
     random_state = np.random.RandomState(100)
     tree_state = 100
     X, Y = get_regression_data(n, m, random_state=random_state)
-    prediction_data = np.random.uniform(
-        0, 10, (n, m))  # Get new data to predict
+    prediction_data = np.random.uniform(0, 10, (n, m))  # Get new data to predict
     forest1 = RandomForest(
         "Regression",
         n_estimators=100,
@@ -180,9 +169,9 @@ def test_deterministic_seeding_regression():
     pred1 = forest1.predict(prediction_data)
     pred2 = forest2.predict(prediction_data)
 
-    assert np.array_equal(
-        pred1, pred2
-    ), "The two random forest predictions were different"
+    assert np.array_equal(pred1, pred2), (
+        "The two random forest predictions were different"
+    )
 
 
 def test_deterministic_seeding_classification():
@@ -191,8 +180,7 @@ def test_deterministic_seeding_classification():
     random_state = np.random.RandomState(100)
     tree_state = 100
     X, Y = get_classification_data(n, m, random_state=random_state)
-    prediction_data = np.random.uniform(
-        0, 10, (n, m))  # Get new data to predict
+    prediction_data = np.random.uniform(0, 10, (n, m))  # Get new data to predict
     forest1 = RandomForest(
         "Classification",
         n_estimators=100,
@@ -214,9 +202,9 @@ def test_deterministic_seeding_classification():
     pred1 = forest1.predict(prediction_data)
     pred2 = forest2.predict(prediction_data)
 
-    assert np.array_equal(
-        pred1, pred2
-    ), "The two random forest predictions were different"
+    assert np.array_equal(pred1, pred2), (
+        "The two random forest predictions were different"
+    )
 
 
 def test_random_forest():
@@ -243,17 +231,17 @@ def test_random_forest():
     with open("./tests/data/forestData.json", "r") as f:
         data = json.loads(f.read())
 
-    assert np.array_equal(
-        np.array(data["gini_pred"]).astype(int), pred["gini_pred"]
-    ), "Gini Index prediction incorrect"
+    assert np.array_equal(np.array(data["gini_pred"]).astype(int), pred["gini_pred"]), (
+        "Gini Index prediction incorrect"
+    )
 
     assert np.array_equal(
         np.array(data["entropy_pred"]).astype(int), pred["entropy_pred"]
     ), "Entropy prediction incorrect"
 
-    assert np.allclose(
-        np.array(data["squared_pred"]), pred["squared_pred"]
-    ), "Squared Error prediction incorrect"
+    assert np.allclose(np.array(data["squared_pred"]), pred["squared_pred"]), (
+        "Squared Error prediction incorrect"
+    )
 
 
 def create_and_save_predict_data(seed=2024):
@@ -305,9 +293,9 @@ def test_gradient_forest():
     tree_predict = tree.predict(X_reg)
     print("")
     forest_predict = forest.predict(X_reg)
-    assert np.allclose(
-        tree_predict, forest_predict
-    ), "Forest predicts different than tree when it should be equal."
+    assert np.allclose(tree_predict, forest_predict), (
+        "Forest predicts different than tree when it should be equal."
+    )
 
 
 def test_quantile_regression_forest():
@@ -323,9 +311,9 @@ def test_quantile_regression_forest():
     forest.fit(X_reg, Y_reg)
     tree_predict = tree.predict(X_reg, quantile=0.95)
     forest_predict = forest.predict(X_reg, quantile=0.95)
-    assert np.allclose(
-        tree_predict, forest_predict
-    ), "Forest predicts different than tree when it should be equal."
+    assert np.allclose(tree_predict, forest_predict), (
+        "Forest predicts different than tree when it should be equal."
+    )
 
 
 def test_random_forest_weights():
@@ -345,8 +333,7 @@ def test_random_forest_weights():
         sampling=None,
     )
     res = squared_forest.predict_weights(X=None, scale=False)
-    trees = [DecisionTree("Regression", max_depth=2)
-             for _ in range(n_estimators)]
+    trees = [DecisionTree("Regression", max_depth=2) for _ in range(n_estimators)]
     for item in trees:
         item.fit(X_reg, Y_reg)
     tree_sum = np.sum(
@@ -392,12 +379,8 @@ def test_tree_based_weights():
     weights_honest_tree = rf_honest_tree.predict_weights(Xtest)
     weights_honest_forest = rf_honest_forest.predict_weights(Xtest)
     # Check shapes
-    assert np.array_equal(
-        weights_boot.shape, [
-            Xtest.shape[0], Xtrain.shape[0]])
-    assert np.array_equal(
-        weights_honest_tree.shape, [
-            Xtest.shape[0], Xtrain.shape[0]])
+    assert np.array_equal(weights_boot.shape, [Xtest.shape[0], Xtrain.shape[0]])
+    assert np.array_equal(weights_honest_tree.shape, [Xtest.shape[0], Xtrain.shape[0]])
     assert np.array_equal(
         weights_honest_forest.shape, [Xtest.shape[0], Xtrain.shape[0]]
     )
@@ -407,9 +390,7 @@ def test_tree_based_weights():
     assert np.sum(weights_honest_forest.sum(axis=1)) == Xtest.shape[0]
     # Check predictions based on weights match regular predictions
     assert np.allclose(rf_boot.predict(Xtest), weights_boot.dot(Ytrain))
-    assert np.allclose(
-        rf_honest_tree.predict(Xtest),
-        weights_honest_tree.dot(Ytrain))
+    assert np.allclose(rf_honest_tree.predict(Xtest), weights_honest_tree.dot(Ytrain))
     assert np.allclose(
         rf_honest_forest.predict(Xtest), weights_honest_forest.dot(Ytrain)
     )
@@ -418,8 +399,10 @@ def test_tree_based_weights():
 def _check_leaf_count(forest: RandomForest, expected_weight: float):
     for tree in forest.trees:
         tree_sum = np.sum([node.weighted_samples for node in tree.leaf_nodes])
-        assert tree_sum == expected_weight, "The expected leaf node failed for\
+        assert tree_sum == expected_weight, (
+            "The expected leaf node failed for\
         the given forest"
+        )
 
 
 def test_honest_sampling_leaf_samples():
@@ -454,18 +437,8 @@ def test_n_jobs():
     n = 1000
     m = 10
     X_reg, Y_reg = get_regression_data(n, m, random_state=random_state)
-    forest_1 = run_squared_error(
-        X_reg,
-        Y_reg,
-        n_jobs=1,
-        n_estimators=100,
-        seed=2024)
-    forest_5 = run_squared_error(
-        X_reg,
-        Y_reg,
-        n_jobs=5,
-        n_estimators=100,
-        seed=2024)
+    forest_1 = run_squared_error(X_reg, Y_reg, n_jobs=1, n_estimators=100, seed=2024)
+    forest_5 = run_squared_error(X_reg, Y_reg, n_jobs=5, n_estimators=100, seed=2024)
     pred_1 = forest_1.predict(X_reg)
     pred_2 = forest_5.predict(X_reg)
     assert np.allclose(pred_1, pred_2)
@@ -488,8 +461,7 @@ def test_n_jobs_predict_forest():
         sampling=None,
     )
     res = squared_forest.predict_weights(X=X_reg, scale=False)
-    trees = [DecisionTree("Regression", max_depth=2)
-             for _ in range(n_estimators)]
+    trees = [DecisionTree("Regression", max_depth=2) for _ in range(n_estimators)]
     for item in trees:
         item.fit(X_reg, Y_reg)
     tree_sum = np.sum(
@@ -536,11 +508,7 @@ def check_OOB(X, Y, forest):
             picked_indices = np.concatenate(
                 (forest.fitting_indices[i], forest.prediction_indices[i])
             )
-        out_of_bag = np.setdiff1d(
-            np.arange(
-                0,
-                forest.X.shape[0]),
-            picked_indices)
+        out_of_bag = np.setdiff1d(np.arange(0, forest.X.shape[0]), picked_indices)
         assert np.array_equal(out_of_bag, forest.out_of_bag_indices[i])
 
 
@@ -571,9 +539,9 @@ def test_OOB_squared_error():
     check_OOB(X, Y, squared_forest)
 
     # Check that out of bag error is close to variance
-    assert np.isclose(
-        variance, squared_forest.oob, atol=0.1
-    ), f"Squared error OOB is {squared_forest.oob}, should be closer to {variance}"
+    assert np.isclose(variance, squared_forest.oob, atol=0.1), (
+        f"Squared error OOB is {squared_forest.oob}, should be closer to {variance}"
+    )
 
 
 def test_OOB_entropy():
@@ -611,9 +579,9 @@ def test_OOB_entropy():
     check_OOB(X, Y, forest)
 
     # Check that out of bag error is close to variance
-    assert np.isclose(
-        0.05, forest.oob, atol=0.01
-    ), f"Entropy OOB is {forest.oob} should be closer to 0.05"
+    assert np.isclose(0.05, forest.oob, atol=0.01), (
+        f"Entropy OOB is {forest.oob} should be closer to 0.05"
+    )
 
 
 if __name__ == "__main__":
@@ -621,12 +589,13 @@ if __name__ == "__main__":
     # test_deterministic_seeding_classification()
     # test_quantile_regression_forest()
     # test_random_forest_weights()
-    # test_honest_sampling_leaf_samples()
+    test_tree_based_weights()
+    test_honest_sampling_leaf_samples()
     # test_n_jobs_predict_forest()
     # test_random_forest()
     # test_gradient_forest()
     # test_OOB_squared_error()
     # test_OOB_entropy()
-    test_tree_based_weights()
-    test_honest_sampling_leaf_samples()
+    # test_tree_based_weights()
+    # test_honest_sampling_leaf_samples()
     print("Done")
