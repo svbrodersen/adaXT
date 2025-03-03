@@ -54,15 +54,15 @@ def predict_quantile(
     indices = []
 
     for i in range(n_obs):
-        cur_node = <Node> tree.root
+        cur_node = <Node> tree.nodes[0]
         while not cur_node.is_leaf:
             dNode = <DecisionNode> cur_node
             cur_split_idx = dNode.split_idx
             cur_threshold = dNode.threshold
             if X_pred[i, cur_split_idx] <= cur_threshold:
-                cur_node = <Node> dNode.left_child
+                cur_node = <Node> tree.nodes[dNode.left_child]
             else:
-                cur_node = <Node> dNode.right_child
+                cur_node = <Node> tree.nodes[dNode.right_child]
 
 
         indices.append(cur_node.indices)
@@ -71,7 +71,11 @@ def predict_quantile(
 
 
 cdef class Predictor():
-    def __init__(self, const double[:, ::1] X, const double[:, ::1] Y, cnp.ndarray nodes, **kwargs):
+    def __init__(self,
+                 const double[:, ::1] X,
+                 const double[:, ::1] Y,
+                 cnp.ndarray nodes,
+                 **kwargs) -> None:
         self.X = np.asarray(X)
         self.Y = np.asarray(Y)
         self.nodes = nodes
@@ -82,7 +86,7 @@ cdef class Predictor():
 
     cpdef dict predict_leaf(self, double[:, ::1] X):
         cdef:
-            int i, cur_split_idx, n_obs
+            int i, cur_split_idx, n_obs, cur_node_idx
             double cur_threshold
             Node cur_node
             DecisionNode dNode
@@ -93,33 +97,23 @@ cdef class Predictor():
         n_obs = X.shape[0]
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node_idx = 0
+            cur_node = <Node> self.nodes[cur_node_idx]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node_idx = dNode.left_child
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node_idx = dNode.right_child
+                cur_node = <Node> self.nodes[cur_node_idx]
 
-            if cur_node.id not in ht.keys():
-                ht[cur_node.id] = [i]
+            if cur_node_idx not in ht.keys():
+                ht[cur_node_idx] = [i]
             else:
-                ht[cur_node.id] += [i]
+                ht[cur_node_idx] += [i]
         return ht
-
-    def __get_state__(self):
-        return {
-                "root": self.root,
-                "X": np.asarray(self.X),
-                "Y": np.asarray(self.Y),
-                }
-
-    def __set_state__(self, d: dict):
-        self.X = d["X"]
-        self.Y = d["Y"]
-        self.root = d["root"]
 
     @staticmethod
     def forest_predict(cnp.ndarray[DOUBLE_t, ndim=2] X_train,
@@ -139,13 +133,13 @@ cdef class Predictor():
                                          **kwargs)
         return np.mean(predictions, axis=0, dtype=DOUBLE)
 
-@cython.final
 cdef class PredictorClassification(Predictor):
     def __init__(self,
                  const double[:, ::1] X,
                  const double[:, ::1] Y,
-                 object root, **kwargs) -> None:
-        super().__init__(X, Y, root, **kwargs)
+                 cnp.ndarray nodes,
+                 **kwargs) -> None:
+        super().__init__(X, Y, nodes, **kwargs)
         self.classes = np.unique(Y)
 
     cdef int __find_max_index(self, float[::1] lst) noexcept nogil:
@@ -170,15 +164,15 @@ cdef class PredictorClassification(Predictor):
         prediction = np.empty(n_obs, dtype=DOUBLE)
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node = <Node> self.nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node = <Node> self.nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node = <Node> self.nodes[dNode.right_child]
             idx = self.__find_max_index(cur_node.value)
             prediction[i] = self.classes[idx]
         return prediction
@@ -196,15 +190,15 @@ cdef class PredictorClassification(Predictor):
         ret_val = []
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node = <Node> self.nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node = <Node> self.nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node = <Node> self.nodes[dNode.right_child]
 
             ret_val.append(cur_node.value)
         return np.array(ret_val)
@@ -239,17 +233,13 @@ cdef class PredictorClassification(Predictor):
                                                  **kwargs)
                 return np.mean(predictions, axis=0, dtype=DOUBLE)
 
-        st = time.time()
         predictions = parallel.async_map(predict_default,
                                          trees,
                                          X_pred=X_pred,
                                          sequential=sequential,
                                          **kwargs)
-        et = time.time()
-        print("Parallel time predict: ", et - st)
         return np.array(np.apply_along_axis(mode, 0, predictions), dtype=int)
 
-@cython.final
 cdef class PredictorRegression(Predictor):
     def predict(self, double[:, ::1] X, **kwargs) -> np.ndarray:
         cdef:
@@ -268,15 +258,15 @@ cdef class PredictorRegression(Predictor):
             prediction = np.empty(n_obs, dtype=DOUBLE)
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node = <Node> self.nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node = <Node> self.nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node = <Node> self.nodes[dNode.right_child]
 
             if cur_node.value.ndim == 1:
                 prediction[i] = cur_node.value[0]
@@ -305,15 +295,15 @@ cdef class PredictorLocalPolynomial(Predictor):
         deriv_mat = np.empty((n_obs, len(order)), dtype=DOUBLE)
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node = <Node> self.nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node = <Node> self.nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node = <Node> self.nodes[dNode.right_child]
 
             ind = 0
             for oo in order:
@@ -349,15 +339,15 @@ cdef class PredictorQuantile(Predictor):
             prediction = np.empty(n_obs, dtype=DOUBLE)
 
         for i in range(n_obs):
-            cur_node = <Node> self.root
+            cur_node = <Node> self.nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> dNode.left_child
+                    cur_node = <Node> self.nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> dNode.right_child
+                    cur_node = <Node> self.nodes[dNode.right_child]
 
             prediction[i] = np.quantile(self.Y[cur_node.indices, 0], quantile)
         return prediction

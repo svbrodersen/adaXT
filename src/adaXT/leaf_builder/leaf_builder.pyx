@@ -8,7 +8,6 @@ cdef class LeafBuilder:
         self.Y = Y
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -40,15 +39,13 @@ cdef class LeafBuilderClassification(LeafBuilder):
         return ret
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
                             double weighted_samples,
                             object parent):
         cdef cnp.ndarray mean = self.__get_mean(indices)
-        return LeafNode(id=leaf_id,
-                        indices=indices,
+        return LeafNode(indices=indices,
                         depth=depth,
                         impurity=impurity,
                         weighted_samples=weighted_samples,
@@ -71,7 +68,6 @@ cdef class LeafBuilderRegression(LeafBuilder):
         return sum / count
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -79,8 +75,7 @@ cdef class LeafBuilderRegression(LeafBuilder):
                             object parent):
 
         cdef cnp.ndarray[DOUBLE_t, ndim=1] mean = self.__get_mean(indices)
-        return LeafNode(leaf_id, indices, depth, impurity, weighted_samples,
-                        mean, parent)
+        return LeafNode(indices, depth, impurity, weighted_samples, mean, parent)
 
 cdef class LeafBuilderPartialLinear(LeafBuilderRegression):
 
@@ -138,7 +133,6 @@ cdef class LeafBuilderPartialLinear(LeafBuilderRegression):
         return (theta0, theta1, muY)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -152,7 +146,7 @@ cdef class LeafBuilderPartialLinear(LeafBuilderRegression):
         theta2 = 0.0
         mean = np.array(muY, dtype=np.double, ndmin=1)
 
-        return LocalPolynomialLeafNode(leaf_id, indices, depth, impurity,
+        return LocalPolynomialLeafNode(indices, depth, impurity,
                                        weighted_samples, mean, parent, theta0,
                                        theta1, theta2)
 
@@ -226,7 +220,6 @@ cdef class LeafBuilderPartialQuadratic(LeafBuilderRegression):
         return (theta0, theta1, theta2, muY)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -239,6 +232,6 @@ cdef class LeafBuilderPartialQuadratic(LeafBuilderRegression):
         theta0, theta1, theta2, muY = self.__theta(indices)
         mean = np.array(muY, dtype=np.double, ndmin=1)
 
-        return LocalPolynomialLeafNode(leaf_id, indices, depth, impurity,
+        return LocalPolynomialLeafNode(indices, depth, impurity,
                                        weighted_samples, mean, parent, theta0,
                                        theta1, theta2)

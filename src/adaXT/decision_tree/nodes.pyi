@@ -8,6 +8,7 @@ class Node:
     indices: np.ndarray
     depth: int
     impurity: float
+    parent: int
 
     def __init__(self, indices: np.ndarray, depth: int, impurity: float) -> None:
         """
@@ -25,9 +26,8 @@ class Node:
 class DecisionNode(Node):
     threshold: float
     split_indx: int
-    left_child: Node | None
-    right_child: Node | None
-    parent: DecisionNode | None
+    left_child: int
+    right_child: int
     split_idx: int
     visited: int
 
@@ -66,8 +66,6 @@ class DecisionNode(Node):
 
 class LeafNode(Node):
     value: list[float]
-    parent: DecisionNode | None
-    id: int
     weighted_samples: float
 
     def __init__(
@@ -101,6 +99,10 @@ class LeafNode(Node):
         pass
 
 class LinearPolynomialLeafNode(LeafNode):
+    theta0: float
+    theta1: float
+    theta2: float
+
     def __init__(
         self,
         id: int,

@@ -1,10 +1,8 @@
-from multiprocessing.dummy import Value
 from typing import Type, Literal
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 import numpy as np
 from .splitter import Splitter
 from ..criteria import Criteria
-from .nodes import LeafNode, Node
 from ..predictor import Predictor
 from ..leaf_builder import LeafBuilder
 from ..base_model import BaseModel
@@ -36,8 +34,8 @@ class DecisionTree(BaseModel):
 
     max_depth: int
     tree_type: str | None
-    leaf_nodes: list[LeafNode]
-    root: Node | None
+    leaf_nodes: NDArray[np.int32]
+    nodes: NDArray
     n_nodes: int
     n_features: int
     n_rows: int
@@ -159,6 +157,8 @@ class DecisionTree(BaseModel):
             self.max_features = self._check_max_features(self.max_features, X.shape[0])
 
         self._tree = _DecisionTree(
+            X=X,
+            Y=Y,
             max_depth=self.max_depth,
             impurity_tol=self.impurity_tol,
             min_samples_split=self.min_samples_split,
@@ -170,11 +170,6 @@ class DecisionTree(BaseModel):
             predictor=self.predictor,
             splitter=self.splitter,
         )
-
-        self._tree.n_rows_fit = X.shape[0]
-        self._tree.n_rows_predict = X.shape[0]
-        self._tree.X_n_rows = X.shape[0]
-        self._tree.n_features = X.shape[1]
 
         if not self.skip_check_input:
             sample_weight = self._check_sample_weight(sample_weight=sample_weight)

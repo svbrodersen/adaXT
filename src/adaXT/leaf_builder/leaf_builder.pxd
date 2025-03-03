@@ -8,7 +8,6 @@ cdef class LeafBuilder:
         double[:, ::1] X
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -24,7 +23,6 @@ cdef class LeafBuilderClassification(LeafBuilder):
     cdef inline cnp.ndarray __get_mean(self, int[::1] indices)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -37,7 +35,6 @@ cdef class LeafBuilderRegression(LeafBuilder):
     cdef cnp.ndarray[DOUBLE_t, ndim=1] __get_mean(self, int[::1] indices)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -52,7 +49,6 @@ cdef class LeafBuilderPartialLinear(LeafBuilderRegression):
     cdef (double, double, double) __theta(self, int[::1] indices)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,
@@ -67,7 +63,6 @@ cdef class LeafBuilderPartialQuadratic(LeafBuilderRegression):
     cdef (double, double, double, double) __theta(self, int[::1] indices)
 
     cpdef object build_leaf(self,
-                            int leaf_id,
                             int[::1] indices,
                             int depth,
                             double impurity,

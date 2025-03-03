@@ -6,8 +6,11 @@ cdef class Predictor():
         # Must be ndarray such that it and all children can be pickled
         cnp.ndarray X
         cnp.ndarray Y
-        cnp.ndarray nodes
         int n_features
+
+    # Make it such that nodes can be updated else where
+    cdef public:
+        cnp.ndarray nodes
 
     cpdef dict predict_leaf(self, double[:, ::1] X)
 

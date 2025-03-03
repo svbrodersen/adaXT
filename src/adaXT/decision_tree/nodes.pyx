@@ -7,11 +7,11 @@ cdef class Node:
             indices: np.ndarray,
             depth: int,
             impurity: float,
-            parent=None) -> None:
+            parent: int = -1) -> None:
 
         self.is_leaf = 0
         self.visited = 0
-        self.parent = None
+        self.parent = parent
         self.indices = np.asarray(indices, np.int32)
         self.depth = depth
         self.impurity = impurity
@@ -24,19 +24,18 @@ cdef class DecisionNode(Node):
             impurity: float,
             threshold: float,
             split_idx: int,
-            left_child: "DecisionNode|LeafNode|None" = None,
-            right_child: "DecisionNode|LeafNode|None" = None,
-            parent: "DecisionNode|None" = None,
+            left_child: int = -1,
+            right_child:  int= -1,
+            parent: int = -1,
             is_leaf: int = 0,
             visited: int = 0) -> None:
 
 
-        super().__init__(indices, depth, impurity)
+        super().__init__(indices, depth, impurity, parent)
         self.threshold = threshold
         self.split_idx = split_idx
         self.left_child = left_child
         self.right_child = right_child
-        self.parent = parent
 
 cdef class LeafNode(Node):
     def __init__(
@@ -46,10 +45,9 @@ cdef class LeafNode(Node):
             impurity: float,
             weighted_samples: float,
             value: np.ndarray,
-            parent: object) -> None:
+            parent: int) -> None:
         super().__init__(indices, depth, impurity, parent)
         self.weighted_samples = weighted_samples
-        self.parent = parent
         self.value = np.asarray(value)
         self.is_leaf = 1
 
@@ -62,7 +60,7 @@ cdef class LocalPolynomialLeafNode(LeafNode):
             impurity: float,
             weighted_samples: float,
             value: np.ndarray,
-            parent: object,
+            parent: int,
             theta0: float,
             theta1: float,
             theta2: float) -> None:

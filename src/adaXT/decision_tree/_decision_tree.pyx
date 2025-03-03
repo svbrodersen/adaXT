@@ -33,13 +33,14 @@ cdef class refit_object(Node):
             self,
             idx: int,
             depth: int,
-            parent: DecisionNode,
+            parent_idx: int,
             is_left: bool) -> None:
 
         self.list_idx = [idx]
         self.depth = depth
-        self.parent = parent
+        self.parent = parent_idx
         self.is_left = is_left
+        self.is_leaf = 1
 
     def add_idx(self, idx: int) -> None:
         self.list_idx.append(idx)
@@ -54,6 +55,7 @@ cdef class _DecisionTree():
         object leaf_builder
         object predictor_instance
         # leaf_nodes list of indices in nodes for LeafNodes
+        cnp.ndarray X, Y
         cnp.ndarray leaf_nodes, nodes
         bint fitted
         long max_depth, min_samples_leaf, max_features
@@ -63,6 +65,8 @@ cdef class _DecisionTree():
 
     def __init__(
             self,
+            X: np.ndarrray,
+            Y: np.ndarray,
             criteria: type[Criteria],
             leaf_builder: type[LeafBuilder],
             predictor: type[Predictor],
@@ -73,6 +77,14 @@ cdef class _DecisionTree():
             min_samples_leaf: int = 1,
             min_improvement: float = 0.0,
             max_features: int | float | Literal["sqrt", "log2"] | None = None) -> None:
+
+        self.X = X
+        self.Y = Y
+
+        self.n_rows_fit = X.shape[0]
+        self.n_rows_predict = X.shape[0]
+        self.X_n_rows = X.shape[0]
+        self.n_features = X.shape[1]
 
         self.criteria = criteria
         self.predictor = predictor
@@ -86,8 +98,6 @@ cdef class _DecisionTree():
         self.min_samples_leaf = min_samples_leaf
         self.min_improvement = min_improvement
 
-        self.leaf_nodes = None
-        self.nodes = []
         self.predictor_instance = None
         fitted = False
 
@@ -102,7 +112,7 @@ cdef class _DecisionTree():
             raise ValueError("The tree has not been trained before trying to predict")
 
         leaf_nodes = self.leaf_nodes
-        if (not leaf_nodes):  # make sure that there are calculated observations
+        if leaf_nodes.shape[0] == 0:  # make sure that there are calculated observations
             raise ValueError("The tree has no leaf nodes")
 
         ht = {}
@@ -178,32 +188,82 @@ cdef class _DecisionTree():
         cdef:
             int i, n_nodes
             int[::1] leaf_nodes
-            object parent
+            int parent_idx, cur_idx
+            Node parent
         leaf_nodes = self.leaf_nodes
-        n_nodes = self.leaf_nodes.shape[0]
-        for i in range(n_nodes):
-            parent = self.nodes[leaf_nodes[i]].parent
+        n_nodes = leaf_nodes.shape[0]
+        for cur_idx in leaf_nodes:
+            parent_idx = self.nodes[cur_idx].parent
             # We are the root node
-            if parent is None:
+            if parent_idx == -1:
                 self.fitted = False
-            # If we are left child
-            elif parent.left_child == self.leaf_nodes[i]:
-                parent.left_child = -1
-            # If we are right child
-            else:
-                parent.right_child = -1
-            self.nodes[leaf_nodes[i]] = None
+            self.nodes[cur_idx] = None
+    
+    cdef int[::1] __fit_refit_objs(self, int[::1] all_idx):
+        cdef:
+            int idx, n_objs, depth, cur_split_idx, obj_idx
+            double cur_threshold
+            Node cur_node
+            DecisionNode dNode
+            int[::1] leaf_indices
+
+        if not self.fitted:
+            return np.asarray([])
+        refit_objs = []
+        for idx in all_idx:
+            # root node always at index 0
+            cur_node = self.nodes[0]
+            cur_node_idx = 0
+            depth = 0
+            while not cur_node.is_leaf:
+                # Mark cur_node as visited
+                dNode = <DecisionNode> cur_node
+                cur_node.visited = 1
+                cur_split_idx = dNode.split_idx
+                cur_threshold = dNode.threshold
+
+                # Check if X should go to the left or right
+                if self.X[idx, cur_split_idx] < cur_threshold:
+                    # If the left or right is none, then there previously was a
+                    # leaf node, and we create a new refit object
+                    if self.nodes[dNode.left_child] is None:
+                        self.nodes[dNode.left_child] = refit_object(idx,
+                                                                    depth,
+                                                                    cur_node_idx,
+                                                                    True)
+                        refit_objs.append(dNode.left_child)
+                    # If there already is a refit object, add this new index to
+                    # the refit object
+                    elif isinstance(self.nodes[dNode.left_child], refit_object):
+                        self.nodes[dNode.left_child].add_idx(idx)
+
+                    cur_node = self.nodes[dNode.left_child]
+                    cur_node_idx = dNode.left_child
+                else:
+                    if self.nodes[dNode.right_child] is None:
+                        self.nodes[dNode.right_child] = refit_object(idx,
+                                                                     depth,
+                                                                     cur_node_idx,
+                                                                     False)
+                        refit_objs.append(dNode.right_child)
+                    elif isinstance(self.nodes[dNode.right_child], refit_object):
+                        self.nodes[dNode.right_child].add_idx(idx)
+
+                    cur_node = self.nodes[dNode.right_child]
+                    cur_node_idx = dNode.right_child
+                depth += 1
+        return np.asarray(refit_objs, dtype=np.int32)
 
     cdef void __fit_new_leaf_nodes(self, cnp.ndarray[DOUBLE_t, ndim=2] X,
                                    cnp.ndarray[DOUBLE_t, ndim=2] Y,
                                    cnp.ndarray[DOUBLE_t, ndim=1] sample_weight,
                                    cnp.ndarray[LONG_t, ndim=1] sample_indices):
         cdef:
-            int idx, n_objs, depth, cur_split_idx
+            int idx, n_objs, depth, cur_split_idx, obj_idx
             double cur_threshold
             Node cur_node
             DecisionNode dNode
-            int[::1] all_idx
+            int[::1] all_idx, refit_objs
             int[::1] leaf_indices
 
         # Set all_idx to contain only sample_indices with a positive weight
@@ -211,45 +271,7 @@ cdef class _DecisionTree():
             [x for x in sample_indices if sample_weight[x] != 0], dtype=np.int32
         )
 
-        if self.fitted:
-            refit_objs = []
-            for idx in all_idx:
-                # root node always at index 0
-                cur_node = self.nodes[0]
-                depth = 0
-                while not cur_node.is_leaf:
-                    # Mark cur_node as visited
-                    dNode = <DecisionNode> cur_node
-                    cur_node.visited = 1
-                    cur_split_idx = cur_node.split_idx
-                    cur_threshold = cur_node.threshold
-
-                    # Check if X should go to the left or right
-                    if X[idx, cur_split_idx] < cur_threshold:
-                        # If the left or right is none, then there previously was a
-                        # leaf node, and we create a new refit object
-                        if self.nodes[cur_node.left_child] is None:
-                            self.nodes[cur_node.left_child] = refit_object(idx,
-                                                                           depth,
-                                                                           cur_node,
-                                                                           True)
-                            refit_objs.append(cur_node.left_child)
-                        # If there already is a refit object, add this new index to
-                        # the refit object
-                        elif isinstance(self.nodes[cur_node.left_child], refit_object):
-                            self.nodes[cur_node].left_child.add_idx(idx)
-
-                        cur_node = self.nodes[cur_node.left_child]
-                    else:
-                        if self.nodes[cur_node].right_child is None:
-                            self.nodes[cur_node.right_child] = refit_object(idx, depth,
-                                                                cur_node, False)
-                            refit_objs.append(cur_node.right_child)
-                        elif isinstance(cur_node.right_child, refit_object):
-                            self.nodes[cur_node.right_child].add_idx(idx)
-
-                        cur_node = self.nodes[cur_node.right_child]
-                    depth += 1
+        refit_objs = self.__fit_refit_objs(all_idx)
 
         leaf_builder_instance = self.leaf_builder(X, Y, all_idx)
         criteria_instance = self.criteria(X, Y, sample_weight)
@@ -257,7 +279,8 @@ cdef class _DecisionTree():
         # Two cases:
         # (1) Only a single root node (n_objs == 0)
         # (2) At least one split (n_objs > 0)
-        if not self.fitted:
+        n_objs = refit_objs.shape[0]
+        if n_objs == 0:
             weighted_samples = dsum(sample_weight, all_idx)
             self.nodes[0] = leaf_builder_instance.build_leaf(
                     indices=all_idx,
@@ -266,75 +289,72 @@ cdef class _DecisionTree():
                     weighted_samples=weighted_samples,
                     parent=-1)
             self.fitted=True
-        else:
-            n_objs = len(refit_objs)
-            nodes = []
-            for i in range(n_objs):
-                obj = self.nodes[refit_objs[i]]
-                leaf_indices = np.array(obj.list_idx, dtype=np.int32)
-                weighted_samples = dsum(sample_weight, leaf_indices)
-                new_node = leaf_builder_instance.build_leaf(
-                        indices=leaf_indices,
-                        depth=obj.depth,
-                        impurity=criteria_instance.impurity(leaf_indices),
-                        weighted_samples=weighted_samples,
-                        parent=obj.parent,
-                        )
-                new_node.visited = 1
-                # overwrite the left child
-                nodes[refit_objs[i]] = new_node
-            self.leaf_nodes = np.asarray(refit_objs)
+            return
+
+        for obj_idx in refit_objs:
+            obj = self.nodes[obj_idx]
+            leaf_indices = np.array(obj.list_idx, dtype=np.int32)
+            weighted_samples = dsum(sample_weight, leaf_indices)
+            new_node = leaf_builder_instance.build_leaf(
+                    indices=leaf_indices,
+                    depth=obj.depth,
+                    impurity=criteria_instance.impurity(leaf_indices),
+                    weighted_samples=weighted_samples,
+                    parent=obj.parent,
+                    )
+            new_node.visited = 1
+            # overwrite the left child
+            self.nodes[obj_idx] = new_node
+        self.leaf_nodes = np.asarray(refit_objs)
 
     # Assumes that each visited node is marked during __fit_new_leaf_nodes
     cdef void __squash_tree(self):
 
         decision_queue = []
-        decision_queue.append((self.nodes[0], 0)
+        decision_queue.append(0)
         while len(decision_queue) > 0:
-            cur_node, cur_node_idx = decision_queue.pop(0)
+            cur_node_idx = decision_queue.pop(0)
+            cur_node = self.nodes[cur_node_idx]
             # If we don't have a decision node, just continue
             if not isinstance(cur_node, DecisionNode):
                 continue
 
             # If left child was not visited, then squash current node and right
             # child
-            if (self.nodes[cur_node.left_child] is None) or
-                    (self.nodes[cur_node.left_child].visited == 0
-                ):
-                parent = self.nodes[cur_node.parent]]
+            if (self.nodes[cur_node.left_child] is None) or (self.nodes[cur_node.left_child].visited == 0):
                 # Root node
-                if parent == -1:
+                parent_idx = cur_node.parent
+                if parent_idx == -1:
                     self.nodes[0] = self.nodes[cur_node.right_child]
                     self.nodes[cur_node.right_child] = None
                 # if current node is left child
-                elif parent.left_child == cur_node_idx:
-                    # update parent to point to the child that has been visited
-                    # instead
-                    parent.left_child = cur_node.right_child
+                elif self.nodes[parent_idx].left_child == cur_node_idx:
+                    # update parent to point to right child instead
+                    self.nodes[parent_idx].left_child = cur_node.right_child
                 else:
-                    parent.right_child = cur_node.right_child
+                    self.nodes[parent_idx].right_child = cur_node.right_child
 
-                cur_node.right_child.parent = parent
+                self.nodes[cur_node.right_child].parent = parent_idx
 
-                # Only add this squashed child to the queue
+                # Add squashed child to queue
                 decision_queue.append(cur_node.right_child)
 
             # Same for the right
-            elif (cur_node.right_child is None) or (cur_node.right_child.visited
-                                                    == 0):
-                parent = self.nodes[cur_node.parent]
+            elif (self.nodes[cur_node.right_child] is None) or (self.nodes[cur_node.right_child].visited == 0):
+                parent_idx = cur_node.parent
                 # Root node
-                if parent is None:
-                    self.root = cur_node.left_child
+                if parent_idx == -1:
+                    self.nodes[0] = cur_node.left_child
+                    self.nodes[cur_node.left_child] = None
                 # if current node is left child
-                elif parent.left_child == cur_node:
+                elif self.nodes[parent_idx].left_child == cur_node:
                     # update parent to point to the child that has been visited
                     # instead
-                    parent.left_child = cur_node.left_child
+                    self.nodes[parent_idx].left_child = cur_node.left_child
                 else:
-                    parent.right_child = cur_node.left_child
+                    self.nodes[parent_idx].right_child = cur_node.left_child
 
-                cur_node.left_child.parent = parent
+                self.nodes[cur_node.left_child].parent = parent_idx
 
                 # Only add this squashed child to the queue
                 decision_queue.append(cur_node.left_child)
@@ -349,7 +369,7 @@ cdef class _DecisionTree():
                          cnp.ndarray[DOUBLE_t, ndim=1] sample_weight,
                          cnp.ndarray[LONG_t, ndim=1] sample_indices) -> None:
 
-        if self.root is None:
+        if not self.fitted:
             raise ValueError("The tree has not been trained before trying to\
                              refit leaf nodes")
 
@@ -361,6 +381,9 @@ cdef class _DecisionTree():
 
         # Now squash all the DecisionNodes not visited
         self.__squash_tree()
+
+        # Make sure the predictor updates to the new nodes
+        self.predictor_instance.nodes = self.nodes
 
 
 # From below here, it is the DepthTreeBuilder
@@ -374,7 +397,7 @@ class queue_obj:
         indices: np.ndarray,
         depth: int,
         impurity: float,
-        parent: Node | None = None,
+        parent_idx: int | None = -1,
         is_left: bool | None = None,
     ) -> None:
         """
@@ -395,7 +418,7 @@ class queue_obj:
         self.indices = indices
         self.depth = depth
         self.impurity = impurity
-        self.parent = parent
+        self.parent_idx = parent_idx
         self.is_left = is_left
 
 
@@ -504,13 +527,14 @@ class DepthTreeBuilder:
         queue.append(queue_obj(all_idx, 0, criteria_instance.impurity(all_idx)))
         n_nodes = 0
         leaf_count = 0  # Number of leaf nodes
+        nodes = []
         while len(queue) > 0:
             obj = queue.pop()
-            indices, depth, impurity, parent, is_left = (
+            indices, depth, impurity, parent_idx, is_left = (
                 obj.indices,
                 obj.depth,
                 obj.impurity,
-                obj.parent,
+                obj.parent_idx,
                 obj.is_left,
             )
             weighted_samples = dsum(self.sample_weight, indices)
@@ -568,42 +592,47 @@ class DepthTreeBuilder:
                     impurity=impurity,
                     threshold=best_threshold,
                     split_idx=best_index,
-                    parent=parent,
+                    parent=parent_idx,
                 )
-                if is_left and parent:  # if there is a parent
-                    parent.left_child = new_node
-                elif parent:
-                    parent.right_child = new_node
+                # Add to node lists
+                nodes.append(new_node)
+                cur_node_idx = n_nodes
+                if is_left and not (parent_idx == -1):  # if there is a parent
+                    nodes[parent_idx].left_child = cur_node_idx
+                elif not (parent_idx == -1):
+                    nodes[parent_idx].right_child = cur_node_idx
 
                 left, right = split
                 # Add the left node to the queue of nodes yet to be computed
                 queue.append(queue_obj(left, depth + 1,
-                             child_imp[0], new_node, 1))
+                             child_imp[0], cur_node_idx, 1))
                 # Add the right node to the queue of nodes yet to be computed
                 queue.append(queue_obj(right, depth + 1,
-                             child_imp[1], new_node, 0))
+                             child_imp[1], cur_node_idx, 0))
 
             else:
                 new_node = leaf_builder_instance.build_leaf(
-                        leaf_id=leaf_count,
                         indices=indices,
                         depth=depth,
                         impurity=impurity,
                         weighted_samples=weighted_samples,
-                        parent=parent)
+                        parent=parent_idx)
+                nodes.append(new_node)
+                cur_node_idx = n_nodes
 
-                if is_left and parent:  # if there is a parent
-                    parent.left_child = new_node
-                elif parent:
-                    parent.right_child = new_node
-                leaf_node_list.append(new_node)
+                if is_left and not (parent_idx == -1):  # if there is a parent
+                    nodes[parent_idx].left_child = cur_node_idx
+                elif not (parent_idx == -1):
+                    nodes[parent_idx].right_child = cur_node_idx
+                leaf_node_list.append(cur_node_idx)
                 leaf_count += 1
-            if n_nodes == 0:
-                root = new_node
+
             n_nodes += 1  # number of nodes increase by 1
 
+        nodes = np.asarray(nodes)
+        tree.fitted = True
         tree.n_nodes = n_nodes
+        tree.nodes = nodes
         tree.max_depth = max_depth_seen
-        tree.root = root
-        tree.leaf_nodes = leaf_node_list
-        tree.predictor_instance = self.predictor(self.X, self.Y, root)
+        tree.leaf_nodes = np.asarray(leaf_node_list, np.int32)
+        tree.predictor_instance = self.predictor(self.X, self.Y, nodes)
