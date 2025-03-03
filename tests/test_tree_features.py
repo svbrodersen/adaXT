@@ -21,10 +21,7 @@ from adaXT.predictor.predictor import PredictorLocalPolynomial
 
 def uniform_x_y(n, m):
     np.random.seed(2024)
-    return (
-        np.random.uniform(
-            1, 1000, (n, m)), np.random.uniform(
-            1, 1000, (n)))
+    return (np.random.uniform(1, 1000, (n, m)), np.random.uniform(1, 1000, (n)))
 
 
 def test_predict_leaf_matrix_classification():
@@ -125,14 +122,15 @@ def test_prediction():
     tree.fit(X, Y_cla)
     prediction = tree.predict(X)
     for i in range(len(Y_cla)):
-        assert (
-            Y_cla[i] == prediction[i]
-        ), f"incorrect prediction at {i}, expected {Y_cla[i]} got {prediction[i]}"
+        assert Y_cla[i] == prediction[i], (
+            f"incorrect prediction at {i}, expected {Y_cla[i]} got {prediction[i]}"
+        )
 
 
 def test_predict_proba_probability():
-    X = np.array([[1, 1], [1, -1], [-1, -1], [-1, 1],
-                  [1, 1], [1, -1], [-1, -1], [-1, 1]])
+    X = np.array(
+        [[1, 1], [1, -1], [-1, -1], [-1, 1], [1, 1], [1, -1], [-1, -1], [-1, 1]]
+    )
     Xtest = np.array([[1, 1], [1, -1], [-1, -1], [-1, 1]])
     Y_cla = np.array([0, 1, 0, 1, 0, 0, 1, 1])
     expected_probs = [[1, 0], [0.5, 0.5], [0.5, 0.5], [0, 1]]
@@ -145,13 +143,15 @@ def test_predict_proba_probability():
     assert pred_probs.shape[0] == Xtest.shape[0]
     assert pred_class.shape[0] == Xtest.shape[0]
     for i in range(Xtest.shape[0]):
-        assert (
-            expected_class[i] == classes[np.argmax(pred_probs[i, :])]
-        ), f"incorrect predicted class at {i}, expected {expected_class[i]} got {classes[np.argmax(pred_probs[i, :])]}"
+        assert expected_class[i] == classes[np.argmax(pred_probs[i, :])], (
+            f"incorrect predicted class at {i}, expected {expected_class[i]} got {classes[np.argmax(pred_probs[i, :])]}"
+        )
         assert (
             expected_probs[i][0] == pred_probs[i][0]
             and expected_probs[i][1] == pred_probs[i][1]
-        ), f"incorrect predicted prob at {i}, expected {expected_probs[i]} got {pred_probs[i]}"
+        ), (
+            f"incorrect predicted prob at {i}, expected {expected_probs[i]} got {pred_probs[i]}"
+        )
 
 
 def test_predict_proba_against_predict():
@@ -166,9 +166,9 @@ def test_predict_proba_against_predict():
     predict_proba = tree.predict(X, predict_proba=True)
 
     for i in range(predict.shape[0]):
-        assert (
-            predict[i] == classes[np.argmax(predict_proba[i, :])]
-        ), f"incorrect prediction at {i}, expected {predict[i]} got {classes[np.argmax(predict_proba[i, :])]}"
+        assert predict[i] == classes[np.argmax(predict_proba[i, :])], (
+            f"incorrect prediction at {i}, expected {predict[i]} got {classes[np.argmax(predict_proba[i, :])]}"
+        )
 
 
 def test_NxN_matrix():
@@ -202,9 +202,9 @@ def test_NxN_matrix():
     )
     for i in range(len(true_weight)):
         for j in range(len(true_weight[0])):
-            assert (
-                leaf_matrix[i, j] == true_weight[i, j]
-            ), f"Failed on ({i}, {j}), should be {true_weight[i, j]} was {leaf_matrix[i, j]}"
+            assert leaf_matrix[i, j] == true_weight[i, j], (
+                f"Failed on ({i}, {j}), should be {true_weight[i, j]} was {leaf_matrix[i, j]}"
+            )
 
 
 def test_max_depth_setting():
@@ -218,10 +218,11 @@ def test_max_depth_setting():
     )
     tree.fit(X, Y)
 
-    for node in tree.leaf_nodes:
-        assert (
-            node.depth <= max_depth_desired
-        ), f"Failed as node depth was,{node.depth} but should be at the most {max_depth_desired}"
+    for node_idx in tree.leaf_nodes:
+        node = tree.nodes[node_idx]
+        assert node.depth <= max_depth_desired, (
+            f"Failed as node depth was,{node.depth} but should be at the most {max_depth_desired}"
+        )
 
 
 def test_impurity_tol_setting():
@@ -231,15 +232,15 @@ def test_impurity_tol_setting():
     impurity_tol_desired = 0.75
 
     tree = DecisionTree(
-        "Classification",
-        criteria=Gini_index,
-        impurity_tol=impurity_tol_desired)
+        "Classification", criteria=Gini_index, impurity_tol=impurity_tol_desired
+    )
     tree.fit(X, Y)
 
-    for node in tree.leaf_nodes:
-        assert (
-            node.impurity <= impurity_tol_desired
-        ), f"Failed as node impurity was, {node.impurity} but should be at the most {impurity_tol_desired}"
+    for node_idx in tree.leaf_nodes:
+        node = tree.nodes[node_idx]
+        assert node.impurity <= impurity_tol_desired, (
+            f"Failed as node impurity was, {node.impurity} but should be at the most {impurity_tol_desired}"
+        )
 
 
 def test_min_samples_split_setting():
@@ -254,10 +255,11 @@ def test_min_samples_split_setting():
         min_samples_split=min_samples_split_desired,
     )
     tree.fit(X, Y)
-    for node in tree.leaf_nodes:
-        assert (
-            min_samples_split_desired <= (len(node.parent.indices))
-        ), f"Failed as node had a parent with {min_samples_split_desired}, but which should have been a leaf node"
+    for node_idx in tree.leaf_nodes:
+        node = tree.nodes[node_idx]
+        assert min_samples_split_desired <= (len(tree.nodes[node.parent].indices)), (
+            f"Failed as node had a parent with {min_samples_split_desired}, but which should have been a leaf node"
+        )
 
 
 def test_min_samples_leaf_setting():
@@ -267,15 +269,15 @@ def test_min_samples_leaf_setting():
     min_samples_leaf_desired = 20
 
     tree = DecisionTree(
-        "Classification",
-        criteria=Gini_index,
-        min_samples_leaf=min_samples_leaf_desired)
+        "Classification", criteria=Gini_index, min_samples_leaf=min_samples_leaf_desired
+    )
     tree.fit(X, Y)
 
-    for node in tree.leaf_nodes:
-        assert (
-            min_samples_leaf_desired <= node.weighted_samples
-        ), f"Failed as node had a parent with {min_samples_leaf_desired}, but which should have been a leaf node"
+    for node_idx in tree.leaf_nodes:
+        node = tree.nodes[node_idx]
+        assert min_samples_leaf_desired <= node.weighted_samples, (
+            f"Failed as node had a parent with {min_samples_leaf_desired}, but which should have been a leaf node"
+        )
 
 
 def test_min_improvement_setting():
@@ -285,15 +287,18 @@ def test_min_improvement_setting():
     min_improvement_desired = 0.000008
 
     tree = DecisionTree(
-        "Classification",
-        criteria=Gini_index,
-        min_improvement=min_improvement_desired)
+        "Classification", criteria=Gini_index, min_improvement=min_improvement_desired
+    )
     tree.fit(X, Y)
 
-    for node in tree.leaf_nodes:
+    for node_idx in tree.leaf_nodes:
+        node = tree.nodes[node_idx]
         assert (
-            abs(node.parent.impurity - node.impurity) > min_improvement_desired
-        ), f"Failed as node had an impurity improvement greater than {abs(node.parent.impurity - node.impurity)}"
+            abs(tree.nodes[node.parent].impurity - node.impurity)
+            > min_improvement_desired
+        ), (
+            f"Failed as node had an impurity improvement greater than {abs(tree.nodes[node.parent].impurity - node.impurity)}"
+        )
 
 
 def get_x_y_classification(n, m):
@@ -311,45 +316,44 @@ def get_x_y_regression(n, m):
 
 
 def assert_tree_equality(t1: DecisionTree, t2: DecisionTree):
-    root1 = t1.root
-    root2 = t2.root
+    root1 = t1.nodes[0]
+    root2 = t2.nodes[0]
 
     q1, q2 = [root1], [root2]
     while len(q1) != 0:
         node1, node2 = q1.pop(), q2.pop()
 
         assert node1.depth == node2.depth
-        assert (
-            node1.impurity == node2.impurity
-        ), f"{t1.tree_type}: {node1.impurity} != {node2.impurity}"
+        assert node1.impurity == node2.impurity, (
+            f"{t1.tree_type}: {node1.impurity} != {node2.impurity}"
+        )
 
         if isinstance(node1, DecisionNode):
             assert isinstance(node2, DecisionNode)
-            assert (
-                node1.threshold == node2.threshold
-            ), f"{t1.tree_type}: {node1.threshold} != {node2.threshold}"
+            assert node1.threshold == node2.threshold, (
+                f"{t1.tree_type}: {node1.threshold} != {node2.threshold}"
+            )
             assert node1.depth == node2.depth
             assert node1.split_idx == node2.split_idx
             if node1.left_child:
-                assert (
-                    node2.left_child is not None
-                ), "Node 1 had a left child but not Node 2"
-                q1.append(node1.left_child)
-                q2.append(node2.left_child)
+                assert node2.left_child is not None, (
+                    "Node 1 had a left child but not Node 2"
+                )
+                q1.append(t1.nodes[node1.left_child])
+                q2.append(t2.nodes[node2.left_child])
             if node1.right_child:
-                assert (
-                    node2.right_child is not None
-                ), "Node 1 had a right child but not Node 2"
-                q1.append(node1.right_child)
-                q2.append(node2.right_child)
+                assert node2.right_child is not None, (
+                    "Node 1 had a right child but not Node 2"
+                )
+                q1.append(t1.nodes[node1.right_child])
+                q2.append(t2.nodes[node2.right_child])
 
         elif isinstance(node1, LeafNode):
             assert node1.weighted_samples == node2.weighted_samples
-            assert np.array_equal(
-                node1.value, node2.value
-            ), f"{t1.tree_type}: {node1.value} != {node2.value}"
-    assert len(
-        q2) == 0, f"{t2.tree_type}: Queue 2 not empty with length {len(q2)}"
+            assert np.array_equal(node1.value, node2.value), (
+                f"{t1.tree_type}: {node1.value} != {node2.value}"
+            )
+    assert len(q2) == 0, f"{t2.tree_type}: Queue 2 not empty with length {len(q2)}"
 
 
 def test_sample_indices_classification():
@@ -478,9 +482,9 @@ def test_quantile_predict():
         X[0, :].reshape(1, -1), quantile=0.95
     )  # As we are never splitting, we can just check a single data point
     np_quantile = np.quantile(Y, 0.95)
-    assert (
-        pred == np_quantile
-    ), f"Quantile predict failed with {pred} - should be {np_quantile}"
+    assert pred == np_quantile, (
+        f"Quantile predict failed with {pred} - should be {np_quantile}"
+    )
 
 
 def test_quantile_predict_array():
@@ -497,9 +501,9 @@ def test_quantile_predict_array():
         X[0, :].reshape(1, -1), quantile=[0.95, 0.1]
     )  # As we are never splitting, we can just check a single data point
     np_quantile = np.quantile(Y, [0.95, 0.1])
-    assert np.array_equal(
-        pred, [np_quantile]
-    ), f"Quantile predict failed with {pred} - should be {np_quantile}"
+    assert np.array_equal(pred, [np_quantile]), (
+        f"Quantile predict failed with {pred} - should be {np_quantile}"
+    )
 
 
 def test_local_polynomial_predict():
@@ -534,13 +538,14 @@ def test_local_polynomial_predict():
     # Check whether residuals are 0
     residuals1 = tree1.predict(X, order=0)[:, 0] - Y1
     residuals2 = tree2.predict(X, order=0)[:, 0] - Y2
-    assert (
-        np.sum(residuals1**2) == 0.0
-    ), "Partial_linear criteria and PredictLocalPolynomial does not behave as expected"
-    assert (
-        np.sum(residuals2**2) == 0.0
-    ), "Partial_quadratic criteria and PredictLocalPolynomial does not behave as expected"
+    assert np.sum(residuals1**2) == 0.0, (
+        "Partial_linear criteria and PredictLocalPolynomial does not behave as expected"
+    )
+    assert np.sum(residuals2**2) == 0.0, (
+        "Partial_quadratic criteria and PredictLocalPolynomial does not behave as expected"
+    )
 
 
 if __name__ == "__main__":
-    test_local_polynomial_predict()
+    test_predict_leaf_matrix_regression()
+    test_predict_leaf_matrix_regression_with_scaling()
