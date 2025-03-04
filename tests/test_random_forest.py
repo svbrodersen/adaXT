@@ -398,7 +398,9 @@ def test_tree_based_weights():
 
 def _check_leaf_count(forest: RandomForest, expected_weight: float):
     for tree in forest.trees:
-        tree_sum = np.sum([node.weighted_samples for node in tree.leaf_nodes])
+        tree_sum = np.sum(
+            [tree.nodes[node_idx].weighted_samples for node_idx in tree.leaf_nodes]
+        )
         assert tree_sum == expected_weight, (
             "The expected leaf node failed for\
         the given forest"
@@ -589,7 +591,7 @@ if __name__ == "__main__":
     # test_deterministic_seeding_classification()
     # test_quantile_regression_forest()
     # test_random_forest_weights()
-    test_tree_based_weights()
+    # test_tree_based_weights()
     test_honest_sampling_leaf_samples()
     # test_n_jobs_predict_forest()
     # test_random_forest()
