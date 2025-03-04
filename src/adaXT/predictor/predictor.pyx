@@ -167,15 +167,15 @@ cdef class PredictorClassification(Predictor):
         nodes = self.nodes
 
         for i in range(n_obs):
-            cur_node = <Node> self.nodes[0]
+            cur_node = <Node> nodes[0]
             while not cur_node.is_leaf:
                 dNode = <DecisionNode> cur_node
                 cur_split_idx = dNode.split_idx
                 cur_threshold = dNode.threshold
                 if X[i, cur_split_idx] <= cur_threshold:
-                    cur_node = <Node> self.nodes[dNode.left_child]
+                    cur_node = <Node> nodes[dNode.left_child]
                 else:
-                    cur_node = <Node> self.nodes[dNode.right_child]
+                    cur_node = <Node> nodes[dNode.right_child]
             idx = self.__find_max_index(cur_node.value)
             prediction[i] = self.classes[idx]
         return prediction

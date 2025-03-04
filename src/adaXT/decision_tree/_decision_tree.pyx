@@ -134,13 +134,6 @@ cdef class _DecisionTree():
                                         size_0, self.n_rows_predict,
                                         scaling=scaling)
 
-    def _forest_predict_leaf(self, double[:, ::1] X_train, double[:, ::1]
-                             Y_train, double[:, ::1] X_pred, **kwargs):
-        if X_pred is None:
-            return self.__get_leaf()
-        predictor_instance = self.predictor(X_train, Y_train, self.nodes)
-        return predictor_instance.predict_leaf(X_pred, **kwargs)
-
     def predict_leaf(self, X: np.ndarray | None = None) -> dict:
         if X is None:
             return self.__get_leaf()
@@ -320,14 +313,27 @@ cdef class _DecisionTree():
             # child
             if (self.nodes[cur_node.left_child] is None) or (self.nodes[cur_node.left_child].visited == 0):
                 # Root node
-                parent_idx = cur_node.parent
-                if parent_idx == -1:
+                if cur_node_idx == 0:
                     self.nodes[0] = self.nodes[cur_node.right_child]
 
-                    # Update to the new index
-                    cur_node.right_child = 0
+                    # Update parent
+                    self.nodes[0].parent = -1
+
+                    # Update the children to point to the new parent if possible
+                    if isinstance(self.nodes[0], DecisionNode):
+                        if self.nodes[self.nodes[0].left_child] is not None:
+                            self.nodes[self.nodes[0].left_child].parent = 0
+
+                        if self.nodes[self.nodes[0].right_child] is not None:
+                            self.nodes[self.nodes[0].right_child].parent = 0
+
+
+                    # Add new root to queue, in case it can be squashed further
+                    decision_queue.append(0)
+                    continue
                 # if current node is left child
-                elif self.nodes[parent_idx].left_child == cur_node_idx:
+                parent_idx = cur_node.parent
+                if self.nodes[parent_idx].left_child == cur_node_idx:
                     # update parent to point to right child instead
                     self.nodes[parent_idx].left_child = cur_node.right_child
                 else:
@@ -344,13 +350,27 @@ cdef class _DecisionTree():
 
             # Same for the right
             elif (self.nodes[cur_node.right_child] is None) or (self.nodes[cur_node.right_child].visited == 0):
-                parent_idx = cur_node.parent
                 # Root node
-                if parent_idx == -1:
+                if cur_node_idx == 0:
                     self.nodes[0] = self.nodes[cur_node.left_child]
-                    cur_node.left_child = 0
+
+                    # Update parent
+                    self.nodes[0].parent = -1
+
+                    # Update the children to point to the new parent if possible
+                    if isinstance(self.nodes[0], DecisionNode):
+                        if self.nodes[self.nodes[0].left_child] is not None:
+                            self.nodes[self.nodes[0].left_child].parent = 0
+
+                        if self.nodes[self.nodes[0].right_child] is not None:
+                            self.nodes[self.nodes[0].right_child].parent = 0
+
+                    decision_queue.append(0)
+                    continue
+
+                parent_idx = cur_node.parent
                 # if current node is left child
-                elif self.nodes[parent_idx].left_child == cur_node:
+                if self.nodes[parent_idx].left_child == cur_node_idx:
                     # update parent to point to the child that has been visited
                     # instead
                     self.nodes[parent_idx].left_child = cur_node.left_child
