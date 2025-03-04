@@ -157,11 +157,14 @@ cdef class PredictorClassification(Predictor):
             double cur_threshold
             Node cur_node
             DecisionNode dNode
+            Node[::1] nodes
             double[::1] prediction
 
+        
         # Make sure that x fits the dimensions.
         n_obs = X.shape[0]
         prediction = np.empty(n_obs, dtype=DOUBLE)
+        nodes = self.nodes
 
         for i in range(n_obs):
             cur_node = <Node> self.nodes[0]

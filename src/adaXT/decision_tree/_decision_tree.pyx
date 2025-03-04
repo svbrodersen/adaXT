@@ -101,9 +101,6 @@ cdef class _DecisionTree():
         self.predictor_instance = None
         fitted = False
 
-        self.n_nodes = -1
-        self.n_features = -1
-
     def predict(self, double[:, ::1] X, **kwargs) -> np.ndarray:
         return self.predictor_instance.predict(X, **kwargs)
 
@@ -198,7 +195,7 @@ cdef class _DecisionTree():
             if parent_idx == -1:
                 self.fitted = False
             self.nodes[cur_idx] = None
-    
+ 
     cdef int[::1] __fit_refit_objs(self, int[::1] all_idx):
         cdef:
             int idx, n_objs, depth, cur_split_idx, obj_idx
@@ -326,7 +323,9 @@ cdef class _DecisionTree():
                 parent_idx = cur_node.parent
                 if parent_idx == -1:
                     self.nodes[0] = self.nodes[cur_node.right_child]
-                    self.nodes[cur_node.right_child] = None
+
+                    # Update to the new index
+                    cur_node.right_child = 0
                 # if current node is left child
                 elif self.nodes[parent_idx].left_child == cur_node_idx:
                     # update parent to point to right child instead
@@ -334,18 +333,22 @@ cdef class _DecisionTree():
                 else:
                     self.nodes[parent_idx].right_child = cur_node.right_child
 
+                # update the parent index
                 self.nodes[cur_node.right_child].parent = parent_idx
 
                 # Add squashed child to queue
                 decision_queue.append(cur_node.right_child)
+
+                # Free up space by setting current node to None
+                self.nodes[cur_node_idx] = None
 
             # Same for the right
             elif (self.nodes[cur_node.right_child] is None) or (self.nodes[cur_node.right_child].visited == 0):
                 parent_idx = cur_node.parent
                 # Root node
                 if parent_idx == -1:
-                    self.nodes[0] = cur_node.left_child
-                    self.nodes[cur_node.left_child] = None
+                    self.nodes[0] = self.nodes[cur_node.left_child]
+                    cur_node.left_child = 0
                 # if current node is left child
                 elif self.nodes[parent_idx].left_child == cur_node:
                     # update parent to point to the child that has been visited
@@ -354,10 +357,14 @@ cdef class _DecisionTree():
                 else:
                     self.nodes[parent_idx].right_child = cur_node.left_child
 
+                # update parent index
                 self.nodes[cur_node.left_child].parent = parent_idx
 
                 # Only add this squashed child to the queue
                 decision_queue.append(cur_node.left_child)
+
+                # Free up space by setting current node to None
+                self.nodes[cur_node_idx] = None
             else:
                 # Neither need squashing, add both to the queue
                 decision_queue.append(cur_node.left_child)

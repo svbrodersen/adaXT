@@ -27,8 +27,7 @@ cdef class DecisionNode(Node):
             left_child: int = -1,
             right_child:  int= -1,
             parent: int = -1,
-            is_leaf: int = 0,
-            visited: int = 0) -> None:
+            is_leaf: int = 0) -> None:
 
 
         super().__init__(indices, depth, impurity, parent)
